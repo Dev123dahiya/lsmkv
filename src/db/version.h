@@ -133,7 +133,7 @@ struct Compaction {
 
 class VersionSet {
  public:
-  VersionSet(std::string dbname, const Options& options, Env* env, TableCache* cache);
+  VersionSet(std::string dbname, const Options& options, Env* env);
   ~VersionSet();
 
   VersionSet(const VersionSet&) = delete;
@@ -195,7 +195,6 @@ class VersionSet {
   const std::string dbname_;
   const Options options_;
   Env* const env_;
-  TableCache* const cache_;
 
   // Guards `current_` only, so a reader taking the current version never
   // waits behind a manifest sync.

@@ -230,7 +230,7 @@ Status DBImpl::Open() {
   LSMKV_TRY(env_->LockFile(LockFileName(dbname_), &db_lock_));
 
   table_cache_ = std::make_unique<TableCache>(dbname_, options_, env_, options_.max_open_files);
-  versions_ = std::make_unique<VersionSet>(dbname_, options_, env_, table_cache_.get());
+  versions_ = std::make_unique<VersionSet>(dbname_, options_, env_);
 
   const bool exists = env_->FileExists(CurrentFileName(dbname_));
   if (exists && options_.error_if_exists) {

@@ -324,11 +324,10 @@ std::vector<FileMetaData> FilesOverlapping(const std::vector<FileMetaData>& file
   return result;
 }
 
-VersionSet::VersionSet(std::string dbname, const Options& options, Env* env, TableCache* cache)
+VersionSet::VersionSet(std::string dbname, const Options& options, Env* env)
     : dbname_(std::move(dbname)),
       options_(options),
       env_(env),
-      cache_(cache),
       current_(std::make_shared<Version>()) {}
 
 VersionSet::~VersionSet() = default;

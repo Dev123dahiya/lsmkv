@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: ${{ matrix.compiler }} ${{ matrix.build }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The warning set is treated as errors on the default build, so a
+          # new warning fails the pull request rather than accumulating.
+          - compiler: gcc
+            cc: gcc-13
+            cxx: g++-13
+            build: release
+            cmake_args: -DCMAKE_BUILD_TYPE=Release -DLSMKV_WERROR=ON
+          - compiler: clang
+            cc: clang
+            cxx: clang++
+            build: release
+            cmake_args: -DCMAKE_BUILD_TYPE=Release -DLSMKV_WERROR=ON
+          # Address and undefined behaviour, with leak detection on.
+          - compiler: clang
+            cc: clang
+            cxx: clang++
+            build: asan+ubsan
+            cmake_args: -DCMAKE_BUILD_TYPE=Debug -DLSMKV_ASAN=ON
+          # The skip list and the background compaction thread are the point
+          # of this one.
+          - compiler: clang
+            cc: clang
+            cxx: clang++
+            build: tsan
+            cmake_args: -DCMAKE_BUILD_TYPE=Debug -DLSMKV_TSAN=ON
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+        run: cmake -S . -B build ${{ matrix.cmake_args }}
+
+      - name: Build
+        run: cmake --build build -j"$(nproc)"
+
+      - name: Test
+        env:
+          ASAN_OPTIONS: detect_leaks=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+          TSAN_OPTIONS: halt_on_error=1
+        run: ./build/lsmkv_tests
+
+      - name: Benchmark
+        # A short run, to prove the driver still works rather than to
+        # publish numbers: a shared CI runner is no place to measure.
+        if: matrix.build == 'release'
+        run: ./build/lsmkv_bench 20000 100 "${RUNNER_TEMP}/lsmkv_ci_bench"
+
+      - name: Command line tool
+        if: matrix.build == 'release'
+        run: |
+          set -eu
+          db="${RUNNER_TEMP}/lsmkv_cli_check"
+          ./build/lsmkv_cli "$db" put greeting hello
+          test "$(./build/lsmkv_cli "$db" get greeting)" = hello
+          ./build/lsmkv_cli "$db" delete greeting
+          if ./build/lsmkv_cli "$db" get greeting; then
+            echo "a deleted key was still readable" >&2
+            exit 1
+          fi
+          ./build/lsmkv_cli "$db" stats
